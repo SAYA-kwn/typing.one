@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>タイピングゲーム</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 50px;
+            position: relative;
+        }
+
+        #word {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        input {
+            font-size: 20px;
+            padding: 5px;
+        }
+
+        #timer, #score, #gameover, #achievement {
+            margin-top: 10px;
+        }
+
+        #achievement-table {
+            margin-top: 20px;
+            width: 50%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        #achievement-table th, #achievement-table td {
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+
+        #achievement-table th {
+            background-color: #f2f2f2;
+        }
+
+        .unlocked {
+            color: red;
+            font-weight: bold;
+        }
+
+        .locked {
+            color: black;
+        }
+
+        .achieved {
+            color: red;
+        }
+
+        /* Eend達成時の暗転と白文字 */
+        #eend-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            font-size: 50px;
+            font-weight: bold;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <h1>タイピングゲーム</h1>
+    <p id="word"></p>
+    <input type="text" id="input" autofocus>
+    <p id="timer">残り時間: 180秒</p>
+    <p id="score">スコア: 0</p>
+    <p id="gameover"></p>
+    <p id="achievement">達成した実績：</p>
+
+    <!-- 実績名の表 -->
+    <table id="achievement-table">
+        <thead>
+            <tr>
+                <th>実績名</th>
+                <th>状態</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Aエンド：スタートライン</td>
+                <td id="achievement-A" class="locked">未達成</td>
+            </tr>
+            <tr>
+                <td>Bエンド：チャレンジャー</td>
+                <td id="achievement-B" class="locked">未達成</td>
+            </tr>
+            <tr>
+                <td>Cエンド：プロフェッショナル</td>
+                <td id="achievement-C" class="locked">未達成</td>
+            </tr>
+            <tr>
+                <td>Dエンド：マスター</td>
+                <td id="achievement-D" class="locked">未達成</td>
+            </tr>
+            <tr>
+                <td>Eエンド：伝説のタイピスト</td>
+                <td id="achievement-E" class="locked">未達成</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Eend達成時のオーバーレイ -->
+    <div id="eend-overlay">Eend</div>
+
+    <script>
+        const words = ["apple", "banana", "cherry", "grape", "orange"];
+        let currentWord = "";
+        let score = 0;
+        let timeLeft = 180;
+        let isGameOver = false;
+        let hasPenalty = false; // ミス入力に対するフラグ
+        let timerStarted = false; // タイマーが開始されたかどうかのフラグ
+        let timerInterval; // タイマーの識別子
+        const input = document.getElementById("input");
+        const wordDisplay = document.getElementById("word");
+        const timerDisplay = document.getElementById("timer");
+        const scoreDisplay = document.getElementById("score");
+        const gameoverDisplay = document.getElementById("gameover");
+        const achievementDisplay = document.getElementById("achievement");
+        const achievementA = document.getElementById("achievement-A");
+        const achievementB = document.getElementById("achievement-B");
+        const achievementC = document.getElementById("achievement-C");
+        const achievementD = document.getElementById("achievement-D");
+        const achievementE = document.getElementById("achievement-E");
+        const eendOverlay = document.getElementById("eend-overlay");
+
+        function newWord() {
+            currentWord = words[Math.floor(Math.random() * words.length)];
+            wordDisplay.textContent = currentWord;
+        }
+
+        function getAchievement(score) {
+            if (score >= 100) return "Eエンド：伝説のタイピスト";
+            if (score >= 50) return "Dエンド：マスター";
+            if (score >= 40) return "Cエンド：プロフェッショナル";
+            if (score >= 30) return "Bエンド：チャレンジャー";
+            if (score >= 20) return "Aエンド：スタートライン";
+            return "実績なし…もう少し頑張ろう！";
+        }
+
+        function unlockAchievement() {
+            if (score >= 100) {
+                achievementE.textContent = "達成";
+                achievementE.classList.add("achieved");
+            }
+            if (score >= 50) {
+                achievementD.textContent = "達成";
+                achievementD.classList.add("achieved");
+            }
+            if (score >= 40) {
+                achievementC.textContent = "達成";
+                achievementC.classList.add("achieved");
+            }
+            if (score >= 30) {
+                achievementB.textContent = "達成";
+                achievementB.classList.add("achieved");
+            }
+            if (score >= 20) {
+                achievementA.textContent = "達成";
+                achievementA.classList.add("achieved");
+            }
+        }
+
+        function endGame(forcedE = false) {
+            clearInterval(timerInterval);
+            input.disabled = true;
+            wordDisplay.textContent = "";
+            isGameOver = true;
+            gameoverDisplay.textContent = `ゲーム終了！あなたのスコアは ${score} 点です。`;
+            const result = forcedE ? "Eエンド：隠された力を解放した！" : getAchievement(score);
+            achievementDisplay.textContent = `達成した実績：${result}`;
+            unlockAchievement(); // 実績解除
+
+            // Eend達成時に暗転し「Eend」と表示
+            if (forcedE) {
+                eendOverlay.style.display = "flex";
+                setTimeout(() => {
+                    eendOverlay.style.display = "none";
+                    // 実績表を更新
+                    achievementE.textContent = "達成";
+                    achievementE.classList.add("achieved");
+                }, 2000); // 2秒後に非表示
+            }
+        }
+
+        input.addEventListener("input", function () {
+            if (isGameOver) return;
+
+            // 最初の入力でタイマースタート
+            if (!timerStarted) {
+                timerStarted = true;
+                timerInterval = setInterval(updateTimer, 1000);
+            }
+
+            const value = this.value;
+
+            // Eend コマンド（制限時間内のみ）
+            if (value === "Eend" && timeLeft > 0) {
+                this.value = "";
+                endGame(true);
+                return;
+            }
+
+            // 正解ならスコア加算
+            if (value === currentWord) {
+                score++;
+                scoreDisplay.textContent = `スコア: ${score}`;
+                this.value = "";
+                newWord();
+                hasPenalty = false; // ペナルティ状態リセット
+                return;
+            }
+
+            // ミス判定（prefixでなければペナルティ）
+            if (!currentWord.startsWith(value)) {
+                if (!hasPenalty) {
+                    timeLeft = Math.max(0, timeLeft - 1);
+                    timerDisplay.textContent = `残り時間: ${timeLeft}秒`;
+                    hasPenalty = true;
+                }
+            } else {
+                hasPenalty = false; // 正しい方向に戻したら再度ペナルティ可能
+            }
+        });
+
+        function updateTimer() {
+            timeLeft--;
+            timerDisplay.textContent = `残り時間: ${timeLeft}秒`;
+            if (timeLeft <= 0) {
+                endGame();
+            }
+        }
+
+        // ゲーム開始
+        newWord();
+    </script>
+</body>
+</html>
